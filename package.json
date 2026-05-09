@@ -1,0 +1,20 @@
+{
+  "name": "kaoyan-daily-task",
+  "version": "0.1.0",
+  "private": true,
+  "description": "考研每日任务书 iPhone/iPad App package",
+  "scripts": {
+    "build:www": "node tools/build-www.js",
+    "cap:add:ios": "npm run build:www && npx cap add ios",
+    "cap:sync": "npm run build:www && npx cap sync",
+    "cap:copy": "npm run build:www && npx cap copy",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/ios": "^7.4.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.4"
+  }
+}

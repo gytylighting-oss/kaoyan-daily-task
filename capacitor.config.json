@@ -1,0 +1,10 @@
+{
+  "appId": "com.kaoyan.dailytask",
+  "appName": "考研每日任务",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "ios": {
+    "contentInset": "automatic",
+    "scheme": "KaoyanDailyTask"
+  }
+}

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#63c7c4" />
+    <title>考研每日任务书</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="home-header">
+        <div>
+          <p id="dateLabel" class="tiny-label">2027 英语二 + 管综</p>
+          <p id="countdownTop" class="countdown-label"></p>
+          <h1>今日</h1>
+        </div>
+        <button id="installButton" class="round-button hidden" type="button" title="安装到桌面" aria-label="安装到桌面">+</button>
+      </header>
+
+      <main>
+        <section id="homeView" class="view active" aria-labelledby="homeTitle">
+          <div id="lockBanner" class="lock-banner hidden"></div>
+
+          <section class="hero-card" aria-labelledby="homeTitle">
+            <div>
+              <p class="tiny-label">自动打卡</p>
+              <h2 id="homeTitle">完成今日任务</h2>
+            </div>
+            <div class="progress-ring" aria-label="今日完成进度">
+              <span id="progressPercent">0%</span>
+            </div>
+          </section>
+
+          <section id="todayTasks" class="task-stack"></section>
+
+          <section class="panel compact-panel">
+            <div class="panel-row">
+              <h3>提醒</h3>
+              <span class="pill">不打卡</span>
+            </div>
+            <div id="todayReminders" class="reminder-grid"></div>
+          </section>
+        </section>
+
+        <section id="statsView" class="view" aria-labelledby="statsTitle">
+          <div class="section-title">
+            <p class="tiny-label">统计</p>
+            <h2 id="statsTitle">进度</h2>
+          </div>
+          <div id="statsGrid" class="stats-grid"></div>
+          <div class="panel">
+            <h3>错词回炉</h3>
+            <div id="mistakeWords" class="compact-list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-row">
+              <h3>全部记录</h3>
+              <span id="estimateLabel" class="pill"></span>
+            </div>
+            <div id="allMemoryList" class="memory-list"></div>
+          </div>
+        </section>
+
+        <section id="settingsView" class="view" aria-labelledby="settingsTitle">
+          <div class="section-title">
+            <p class="tiny-label">自动保存</p>
+            <h2 id="settingsTitle">设置</h2>
+          </div>
+
+          <div class="panel settings-grid">
+            <label>
+              计划开始日
+              <input id="startDateInput" type="date" />
+            </label>
+            <label>
+              新词起步
+              <input id="baseWordsInput" type="number" min="5" max="20" />
+            </label>
+            <label>
+              今日新词数
+              <input id="currentWordsInput" type="number" min="5" max="60" />
+            </label>
+            <label>
+              新词上限
+              <input id="maxWordsInput" type="number" min="10" max="60" />
+            </label>
+            <label>
+              每日短语
+              <input id="phraseCountInput" type="number" min="1" max="6" />
+            </label>
+            <label>
+              学习开始
+              <input id="studyStartInput" type="time" />
+            </label>
+            <label>
+              学习结束
+              <input id="studyEndInput" type="time" />
+            </label>
+            <label>
+              站立开始
+              <input id="standStartInput" type="time" />
+            </label>
+            <label>
+              站立结束
+              <input id="standEndInput" type="time" />
+            </label>
+          </div>
+
+          <div class="panel settings-grid">
+            <label>
+              DeepSeek API Key
+              <input id="deepSeekKeyInput" type="password" placeholder="sk-..." />
+            </label>
+            <label>
+              DeepSeek 模型
+              <input id="deepSeekModelInput" type="text" placeholder="deepseek-v4-flash" />
+            </label>
+          </div>
+
+          <div class="panel upload-panel">
+            <button id="uploadProgressButton" type="button" class="primary-button upload-button">上传进度</button>
+            <div class="upload-progress" aria-live="polite">
+              <div class="upload-progress-header">
+                <strong id="uploadProgressLabel">云端同步</strong>
+                <span id="uploadProgressText">0%</span>
+              </div>
+              <div class="progress-track"><span id="uploadProgressFill" class="progress-fill"></span></div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="主导航">
+        <button class="nav-button active" data-view="homeView" type="button">今日</button>
+        <button class="nav-button" data-view="statsView" type="button">统计</button>
+        <button class="nav-button" data-view="settingsView" type="button">设置</button>
+      </nav>
+    </div>
+
+    <section id="studyScreen" class="study-screen hidden" aria-live="polite">
+      <header class="study-header">
+        <button id="backButton" type="button" class="round-button" aria-label="返回">‹</button>
+        <div>
+          <p id="studyKicker" class="tiny-label"></p>
+          <h2 id="studyTitle"></h2>
+        </div>
+      </header>
+      <div id="studyBody" class="study-body"></div>
+    </section>
+
+    <div id="wordPopover" class="word-popover hidden"></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="generated-content.js"></script>
+    <script src="generated-grammar.js"></script>
+    <script src="generated-writing.js"></script>
+    <script src="generated-exam.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

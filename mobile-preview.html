@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>考研每日任务书 - 设备预览</title>
+  <style>
+    :root {
+      --ink: #172425;
+      --line: #dfe9e6;
+      --wash: #eef7f4;
+      --paper: #f8fbfa;
+      --aqua-dark: #178f86;
+      --shadow: 0 24px 70px rgba(23, 36, 37, .16);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: var(--wash);
+    }
+
+    button,
+    a {
+      font: inherit;
+    }
+
+    .page {
+      width: min(1200px, calc(100vw - 24px));
+      margin: 0 auto;
+      padding: 18px 0;
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .side {
+      position: sticky;
+      top: 18px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .side button,
+    .side a {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      text-decoration: none;
+    }
+
+    .side button.active {
+      border-color: transparent;
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .stage {
+      min-height: calc(100vh - 36px);
+      display: grid;
+      justify-items: center;
+      align-items: start;
+    }
+
+    .device {
+      display: none;
+      width: 100%;
+      justify-items: center;
+    }
+
+    .device.active {
+      display: grid;
+    }
+
+    .frame {
+      overflow: hidden;
+      border: 10px solid #111;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .iphone {
+      width: clamp(320px, 38vw, 430px);
+      height: min(88vh, 860px);
+      border-radius: 34px;
+    }
+
+    .ipad {
+      width: min(860px, 78vw);
+      height: min(88vh, 980px);
+      min-width: 520px;
+      min-height: 560px;
+      max-width: calc(100vw - 230px);
+      max-height: calc(100vh - 36px);
+      resize: both;
+      border-radius: 28px;
+    }
+
+    iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #fff;
+    }
+
+    .watch-shell {
+      width: 184px;
+      height: 224px;
+      border: 9px solid #151515;
+      border-radius: 42px;
+      background: #0f1415;
+      box-shadow: var(--shadow);
+      padding: 18px;
+      color: #fff;
+      cursor: pointer;
+      user-select: none;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .watch-screen {
+      display: grid;
+      gap: 10px;
+      justify-items: center;
+    }
+
+    .bell {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: var(--aqua-dark);
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+    }
+
+    .watch-title {
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .watch-sub {
+      color: #bdd0cd;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .watch-shell.responded .bell {
+      background: #67b991;
+    }
+
+    @media (max-width: 760px) {
+      .page {
+        grid-template-columns: 1fr;
+      }
+
+      .side {
+        position: static;
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .ipad {
+        width: calc(100vw - 24px);
+        min-width: 0;
+        max-width: calc(100vw - 24px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <nav class="side" aria-label="设备">
+      <button class="active" data-device="iphone" type="button">iPhone</button>
+      <button data-device="ipad" type="button">iPad</button>
+      <button data-device="watch" type="button">Watch</button>
+      <a href="./index.html">应用</a>
+    </nav>
+
+    <section class="stage">
+      <div id="iphone" class="device active">
+        <div class="frame iphone">
+          <iframe title="iPhone" src="./index.html"></iframe>
+        </div>
+      </div>
+
+      <div id="ipad" class="device">
+        <div class="frame ipad">
+          <iframe title="iPad" src="./index.html"></iframe>
+        </div>
+      </div>
+
+      <div id="watch" class="device">
+        <div id="watchShell" class="watch-shell" role="button" tabindex="0" aria-label="响应提醒">
+          <div class="watch-screen">
+            <div class="bell" aria-hidden="true">🔔</div>
+            <div id="watchTitle" class="watch-title">提醒事项</div>
+            <div id="watchSub" class="watch-sub">声音 + 震动</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const buttons = Array.from(document.querySelectorAll("[data-device]"));
+    const devices = Array.from(document.querySelectorAll(".device"));
+    const watch = document.querySelector("#watchShell");
+    const watchTitle = document.querySelector("#watchTitle");
+    const watchSub = document.querySelector("#watchSub");
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        buttons.forEach((item) => item.classList.toggle("active", item === button));
+        devices.forEach((device) => device.classList.toggle("active", device.id === button.dataset.device));
+      });
+    });
+
+    function respondWatch() {
+      watch.classList.add("responded");
+      watchTitle.textContent = "已响应";
+      watchSub.textContent = "提醒已确认";
+    }
+
+    watch.addEventListener("click", respondWatch);
+    watch.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") respondWatch();
+    });
+  </script>
+</body>
+</html>
