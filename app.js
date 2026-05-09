@@ -201,6 +201,7 @@ let saveTimer = null;
 init();
 
 function init() {
+  bindNoAccidentalZoom();
   bindNavigation();
   bindActions();
   bindGlobalSpeechAndLookup();
@@ -209,6 +210,16 @@ function init() {
   loadVoices();
   window.speechSynthesis?.addEventListener?.("voiceschanged", loadVoices);
   renderAll();
+}
+
+function bindNoAccidentalZoom() {
+  let lastTouchEnd = 0;
+  document.addEventListener("dblclick", (event) => event.preventDefault(), { passive: false });
+  document.addEventListener("touchend", (event) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 320) event.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
 }
 
 function loadState() {
@@ -339,6 +350,7 @@ function renderToday() {
     lock.classList.add("hidden");
   }
 
+  plan.tasks = plan.tasks.filter((item) => item.kind !== "management");
   $("#todayTasks").innerHTML = plan.tasks.map(renderTaskCard).join("");
   $$(".task-card [data-start]").forEach((button) => {
     button.addEventListener("click", () => openSession(button.dataset.start));
@@ -533,7 +545,6 @@ function weekendTasks(wordIds, phraseIds, key, truthTraining) {
   const tasks = [
     task(times.vocab, "周末单词循环", "不新增大量新词，集中复习本周错词和到期词。", "vocab", [`${wordIds.length} 个`]),
     task(times.phrases, "短语复盘", "把短语放进例句和作文句里复习。", "phrases", [`${phraseIds.length} 个`]),
-    task("15:00", "管综训练", "数学基础题 + 逻辑题型训练，整理错题。", "management"),
     task(times.grammar, "语法整合", "复盘本周语法，用本周词汇理解句子。", "grammar"),
     task(times.writing, isTruthWritingPhase(key) ? "真题写作复盘" : "写作训练", isTruthWritingPhase(key) ? "复盘本周真题写作，重写一篇最薄弱的作文。" : "手写一个小作文片段或大作文段落。", "writing"),
     task(times.review, "收尾复盘", "生成下周节奏，系统自动打卡。", "review")
@@ -636,12 +647,17 @@ function openSession(kind) {
   } else {
     session = { kind };
   }
-  $("#studyScreen").classList.remove("hidden");
+  const studyScreen = $("#studyScreen");
+  studyScreen.classList.toggle("memory-mode", kind === "vocab" || kind === "phrases");
+  studyScreen.classList.toggle("lesson-mode", kind !== "vocab" && kind !== "phrases");
+  studyScreen.classList.remove("hidden");
   renderSession();
 }
 
 function closeStudy() {
-  $("#studyScreen").classList.add("hidden");
+  const studyScreen = $("#studyScreen");
+  studyScreen.classList.add("hidden");
+  studyScreen.classList.remove("memory-mode", "lesson-mode");
   session = null;
   renderAll();
 }
@@ -667,6 +683,7 @@ function renderWordSession() {
 
   const id = session.queue[session.index];
   const word = getWord(id);
+  const actionState = session.revealed ? "" : "disabled aria-disabled=\"true\"";
   $("#studyTitle").textContent = `剩余 ${Math.max(0, session.queue.length - session.index)} 个`;
   $("#studyBody").innerHTML = `
     <article class="momo-card">
@@ -683,8 +700,8 @@ function renderWordSession() {
         ${session.revealed ? renderWordAnswer(word) : `<div class="tap-hint">请回忆单词发音和释义<br>点击屏幕显示答案</div>`}
       </button>
       <div class="momo-actions">
-        <button class="answer-button known" type="button" data-result="known">认识</button>
-        <button class="answer-button unknown" type="button" data-result="unknown">不认识</button>
+        <button class="answer-button known" type="button" data-result="known" ${actionState}>认识</button>
+        <button class="answer-button unknown" type="button" data-result="unknown" ${actionState}>不认识</button>
       </div>
     </article>
   `;
@@ -693,7 +710,14 @@ function renderWordSession() {
     renderSession();
   });
   $$("[data-result]").forEach((button) => {
-    button.addEventListener("click", () => handleMemoryResult(id, button.dataset.result, "word"));
+    button.addEventListener("click", () => {
+      if (!session.revealed) {
+        session.revealed = true;
+        renderSession();
+        return;
+      }
+      handleMemoryResult(id, button.dataset.result, "word");
+    });
   });
 }
 
@@ -720,6 +744,7 @@ function renderPhraseSession() {
 
   const id = session.queue[session.index];
   const phrase = getPhrase(id);
+  const actionState = session.revealed ? "" : "disabled aria-disabled=\"true\"";
   $("#studyTitle").textContent = `剩余 ${Math.max(0, session.queue.length - session.index)} 个`;
   $("#studyBody").innerHTML = `
     <article class="momo-card">
@@ -732,8 +757,8 @@ function renderPhraseSession() {
         ${session.revealed ? renderPhraseAnswer(phrase) : `<div class="tap-hint">请回忆短语意思和例句<br>点击屏幕显示答案</div>`}
       </button>
       <div class="momo-actions">
-        <button class="answer-button known" type="button" data-result="known">认识</button>
-        <button class="answer-button unknown" type="button" data-result="unknown">不认识</button>
+        <button class="answer-button known" type="button" data-result="known" ${actionState}>认识</button>
+        <button class="answer-button unknown" type="button" data-result="unknown" ${actionState}>不认识</button>
       </div>
     </article>
   `;
@@ -742,7 +767,14 @@ function renderPhraseSession() {
     renderSession();
   });
   $$("[data-result]").forEach((button) => {
-    button.addEventListener("click", () => handleMemoryResult(id, button.dataset.result, "phrase"));
+    button.addEventListener("click", () => {
+      if (!session.revealed) {
+        session.revealed = true;
+        renderSession();
+        return;
+      }
+      handleMemoryResult(id, button.dataset.result, "phrase");
+    });
   });
 }
 
@@ -756,6 +788,40 @@ function renderPhraseAnswer(phrase) {
       <p><strong>写作迁移：</strong>今天写作里尽量把这个短语放进一个句子。</p>
     </div>
   `;
+}
+
+function writingPracticeLines(lesson, words, phrases) {
+  const materialWord = words.find((word) => word?.term)?.term || "practice";
+  const materialPhrase = phrases.find((phrase) => phrase?.phrase)?.phrase || "in this regard";
+  const baseSentence = lesson.model || lesson.pattern || "I am writing to offer my suggestions.";
+  const patternSentence = (lesson.pattern || baseSentence)
+    .replace(/\.\.\./g, materialPhrase)
+    .replace(/\s+$/, "");
+  const secondSentence = patternSentence === baseSentence
+    ? `I suggest that you pay attention to ${materialPhrase} and keep practicing ${materialWord}.`
+    : patternSentence;
+  return [
+    {
+      label: "第 1 句",
+      cn: lesson.translation || "先理解中文，再抄写英文句子。",
+      en: baseSentence,
+      structure: writingStructureHint(lesson, 0)
+    },
+    {
+      label: "第 2 句",
+      cn: `把今天的素材 ${materialWord} / ${materialPhrase} 放进同一类句型里。`,
+      en: secondSentence,
+      structure: writingStructureHint(lesson, 1)
+    }
+  ];
+}
+
+function writingStructureHint(lesson, index) {
+  const subtype = lesson.subtype || lesson.type || "作文";
+  const structure = Array.isArray(lesson.structure) ? lesson.structure[index] || lesson.structure[0] : "";
+  if (lesson.phase === "truth") return "先判断题型和收信人，再按题干要求补齐目的、要点和结尾。";
+  if (index === 0) return `${subtype}开头句：写信目的 + 具体动作。${structure ? `对应：${structure}` : ""}`;
+  return `${subtype}主体句：连接词 + 建议/原因/安排 + 具体名词。`;
 }
 
 function handleMemoryResult(id, result, type) {
@@ -824,24 +890,34 @@ function renderWritingSession(plan) {
   const lesson = writingLessons[plan.writingIndex % writingLessons.length];
   const words = plan.wordIds.slice(0, 5).map(getWord);
   const phrases = plan.phraseIds.slice(0, 3).map(getPhrase);
+  const practiceLines = writingPracticeLines(lesson, words, phrases);
   $("#studyKicker").textContent = lesson.title;
   $("#studyTitle").textContent = lesson.phase === "truth" ? "真题写作整篇训练" : `${lesson.type || "写作"}：${lesson.subtype || "结构课"}`;
   $("#studyBody").innerHTML = `
     <article class="lesson-card">
       <p class="tiny-label">${lesson.phase === "truth" ? "9 月后按真题题干整篇训练" : "先判断类型，再拆段落，最后写句子"}</p>
-      <p class="lesson-sentence">${renderLookupText(lesson.model)}</p>
-      <p class="body-text"><strong>中文：</strong>${escapeHtml(lesson.translation)}</p>
-      <p class="body-text"><strong>句型：</strong>${escapeHtml(lesson.pattern)}</p>
       <div class="writing-steps">
         <div class="writing-step"><strong>作文结构</strong><p class="body-text">${lesson.structure.map(escapeHtml).join(" → ")}</p></div>
-        ${(lesson.paragraphBreakdown || []).map((step, index) => `<div class="writing-step"><strong>段落 ${index + 1}</strong><p class="body-text">${escapeHtml(step)}</p></div>`).join("")}
-        ${lesson.exercises.map((step, index) => `<div class="writing-step"><strong>练习 ${index + 1}</strong><p class="body-text">${escapeHtml(step)}</p></div>`).join("")}
+        ${(lesson.paragraphBreakdown || []).slice(0, 3).map((step, index) => `<div class="writing-step"><strong>段落 ${index + 1}</strong><p class="body-text">${escapeHtml(step)}</p></div>`).join("")}
+      </div>
+      <div class="writing-practice-list">
+        ${practiceLines.map((line) => `
+          <section class="writing-practice-card">
+            <p class="tiny-label">${escapeHtml(line.label)}</p>
+            <p class="body-text"><strong>中文：</strong>${escapeHtml(line.cn)}</p>
+            <p class="body-text"><strong>结构：</strong>${escapeHtml(line.structure)}</p>
+            <p class="lesson-sentence">${renderLookupText(line.en)}</p>
+            <div class="writing-copy-lines" aria-label="三行手写练习区">
+              <span></span><span></span><span></span>
+            </div>
+          </section>
+        `).join("")}
       </div>
       <p class="body-text"><strong>今日素材：</strong>${words.map((word) => `<span class="speakable" data-speak="${escapeAttr(word.term)}">${escapeHtml(word.term)}</span>`).join("、")} ${phrases.map((phrase) => `<span class="speakable" data-speak="${escapeAttr(phrase.phrase)}">${escapeHtml(phrase.phrase)}</span>`).join("、")}</p>
-      <button id="deepSeekButton" class="small-button" type="button">用 DeepSeek 生成今日写作练习</button>
+      <button id="deepSeekButton" class="small-button ${lesson.phase === "truth" ? "" : "hidden"}" type="button">用 DeepSeek 批改真题写作</button>
       <div id="deepSeekOutput" class="body-text"></div>
     </article>
-    ${canvasPanel("writing", "手写作文句")}
+    ${canvasPanel("writing", "抄写上面两句")}
   `;
   $("#deepSeekButton").addEventListener("click", () => generateDeepSeekWriting(lesson, words, phrases));
   setupCanvas("writing");

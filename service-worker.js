@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaoyan-daily-task-v8";
+const CACHE_NAME = "kaoyan-daily-task-v9";
 const APP_ASSETS = [
   "./",
   "./index.html",
