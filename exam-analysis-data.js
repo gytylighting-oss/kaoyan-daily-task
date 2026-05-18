@@ -54,8 +54,17 @@
   const yearCache = new Map();
   const sectionCache = new Map();
   const READING_OVERRIDES = (global.KAOYAN_READING_OVERRIDES && global.KAOYAN_READING_OVERRIDES.overrides) || {};
+  const BUNDLED_ANALYSIS = global.KAOYAN_ANALYSIS_BUNDLE || {};
+
+  function bundledJson(path) {
+    const key = String(path || "").replace(/^\.\/analysis_processed\//, "").replace(/^analysis_processed\//, "");
+    const value = BUNDLED_ANALYSIS[key];
+    return value ? JSON.parse(JSON.stringify(value)) : null;
+  }
 
   async function fetchJson(path) {
+    const bundled = bundledJson(path);
+    if (bundled) return bundled;
     const response = await fetch(path, { cache: "force-cache" });
     if (!response.ok) {
       throw new Error(`Unable to load ${path}: ${response.status}`);

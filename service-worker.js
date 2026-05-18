@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaoyan-daily-task-v36";
+const CACHE_NAME = "kaoyan-daily-task-v37";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -55,12 +55,10 @@ self.addEventListener("fetch", (event) => {
   if (shouldRuntimeCache) {
     event.respondWith(
       caches.open(CACHE_NAME).then((cache) =>
-        caches.match(event.request).then((cached) =>
-          cached || fetch(event.request).then((response) => {
+        fetch(event.request).then((response) => {
             if (response.ok) cache.put(event.request, response.clone());
             return response;
-          })
-        )
+          }).catch(() => caches.match(event.request))
       )
     );
     return;

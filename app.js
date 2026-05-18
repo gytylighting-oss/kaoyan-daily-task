@@ -849,15 +849,7 @@ async function renderAnalysisExamHub() {
   } catch (error) {
     console.error(error);
     if (root.dataset.examLoadToken !== loadToken) return;
-    root.innerHTML = `
-      <div class="section-title">
-        <p class="tiny-label">真题题库</p>
-        <h2 id="examTitle">数据读取失败</h2>
-      </div>
-      <section class="panel compact-panel">
-        <p class="body-text">没有读到 ${selectedYear} 年的 analysis_processed 数据，请确认文件已放在对应年份目录。</p>
-      </section>
-    `;
+    renderExamHubV2();
     return;
   }
   if (root.dataset.examLoadToken !== loadToken) return;
@@ -2274,13 +2266,11 @@ function renderWritingSession(plan) {
               <span aria-hidden="true">🔊</span>
               <strong>朗读整句</strong>
             </button>
-            ${canvasPanel(`writing-${index}`, "手写背诵")}
           </section>
         `).join("")}
       </div>
     </article>
   `;
-  practiceLines.forEach((_, index) => setupCanvas(`writing-${index}`, "writing"));
 }
 
 function paragraphName(index) {
