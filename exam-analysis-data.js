@@ -807,6 +807,17 @@
         D: cleanOptionText(match[5])
       };
     }
+    const plainPattern = /(?:^|\s)(\d{1,2})\.\s*A\.\s*([\s\S]*?)\s+B\.\s*([\s\S]*?)\s+C\.\s*([\s\S]*?)\s+D\.\s*([\s\S]*?)(?=\s+\d{1,2}\.\s*A\.|\s*$)/g;
+    while ((match = plainPattern.exec(source))) {
+      const number = Number(match[1]);
+      if (options[number]) continue;
+      options[number] = {
+        A: cleanOptionText(match[2]),
+        B: cleanOptionText(match[3]),
+        C: cleanOptionText(match[4]),
+        D: cleanOptionText(match[5])
+      };
+    }
     return options;
   }
 
@@ -865,13 +876,24 @@
       .flatMap(splitReadingParagraphCandidates)
       .map((paragraph) => cleanReadingPassageText(paragraph))
       .filter(Boolean)
-      .filter((paragraph) => !isExamPageArtifact(paragraph));
+      .filter((paragraph) => !isExamPageArtifact(paragraph))
+      .filter((paragraph) => !isReadingQuestionArtifact(paragraph));
     if (!cleaned.length) return [];
     const shortCount = cleaned.filter((paragraph) => paragraph.length <= 18 && !/[.!?。]$/.test(paragraph)).length;
     const normalized = cleaned.length >= 30 && shortCount / cleaned.length > 0.65
       ? [cleanLooseWordStream(cleaned.join(" "))]
       : cleaned.map(cleanLooseWordStream).filter(Boolean);
-    return splitLongReadingParagraphs(mergeSoftBrokenParagraphs(normalized));
+    return splitLongReadingParagraphs(mergeSoftBrokenParagraphs(normalized)).map(polishReadingParagraph);
+  }
+
+  function polishReadingParagraph(value) {
+    return String(value || "")
+      .replace(/,\"/g, ", \"")
+      .replace(/\.\"/g, ". \"")
+      .replace(/\b([A-Za-z]+)-oriented-and\b/g, "$1-oriented and")
+      .replace(/\bsports-in\b/g, "sports in")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   function splitReadingParagraphCandidates(value) {
@@ -911,7 +933,17 @@
   }
 
   function isExamPageArtifact(text) {
-    return /(?:管理类专业学位联考英语试题|MBA\s*大师|共\s*\d+\s*页|^\d+\s*$)/i.test(text);
+    return /(?:管理类专业学位联考英语试题|参考答案|MBA\s*大师|共\s*\d+\s*页|^\d+\s*$)/i.test(text);
+  }
+
+  function isReadingQuestionArtifact(text) {
+    const source = cleanText(text);
+    if (!source) return true;
+    if (/^(?:According to|Which of the following|What can be inferred|The author|The phrase|It can be learned|The study suggests|Recruiting more|Many people work|Involuntary part-time|Which part of the jobs picture)\b/i.test(source)) return true;
+    if (/^(?:The prospect of|The increase of|The possibility of|The acceleration of)\b/i.test(source) && source.length < 120) return true;
+    if (/\?\s+(?:[A-Z][a-z]+[\w'-]*\s*){2,}\./.test(source)) return true;
+    if (/\b(?:A big house|A special tour|critical|supportive|sympathetic|ambiguous)\b/.test(source) && source.length < 260) return true;
+    return false;
   }
 
   function mergeSoftBrokenParagraphs(paragraphs) {
@@ -994,6 +1026,9 @@
     return cleanKnownExamOcr(String(value || "")
       .replace(/\r/g, "")
       .replace(/\u0000/g, "")
+      .replace(/\s*(?:20\d{2}\s*年\s*)?管理类专业学位联考英语试题\s*[·\-－—]?\s*\d+\s*[·\-－—]?\s*(?:\(\s*共\s*\d+\s*页\s*\))?/g, " ")
+      .replace(/\s*共\s*\d+\s*页\s*/g, " ")
+      .replace(/\s*参考答案[:：]?\s*管理类专业学位联考英语试题[\s\S]*?$/g, " ")
       .replace(/管理类专业学位联考英语试题\s*[-－—]?\s*\d+\s*[-－—]?/g, "")
       .replace(/\s*MBA\s*大师\s*/gi, " ")
       .replace(/&amp;/g, "&")
@@ -1034,6 +1069,9 @@
 
   function cleanLooseWordStream(value) {
     return cleanKnownExamOcr(value)
+      .replace(/,\"/g, ", \"")
+      .replace(/\.\"/g, ". \"")
+      .replace(/([,.;:?!])(?=["A-Za-z])/g, "$1 ")
       .replace(/\s+([,.;:?!%])/g, "$1")
       .replace(/([(\[$])\s+/g, "$1")
       .replace(/\s+([)\]”"])/g, "$1")
@@ -1046,6 +1084,31 @@
 
   function cleanKnownExamOcr(value) {
     return String(value || "")
+      .replace(/\uE0B3/g, "'")
+      .replace(/[\uD800-\uDFFF]/g, "'")
+      .replace(/''/g, "'")
+      .replace(/\b(Mr|Ms|Mrs|Dr)\s+\./g, "$1.")
+      .replace(/([A-Za-z])\s+'(s|re|ve|d|ll|m|t)\b/g, "$1'$2")
+      .replace(/([,.;:?!])(?=["A-Za-z])/g, "$1 ")
+      .replace(/\s+([,.;:?!%])/g, "$1")
+      .replace(/\bpersonali\s+zed\b/gi, "personalized")
+      .replace(/\blawye\s+r\b/gi, "lawyer")
+      .replace(/\bonc\s+e\b/gi, "once")
+      .replace(/\bw\s+onders\b/gi, "wonders")
+      .replace(/\bfit\s+mess\b/gi, "fitness")
+      .replace(/\bhe\s+r\b/gi, "her")
+      .replace(/\bhapp\s+ier\b/gi, "happier")
+      .replace(/\bwell\s*-\s*being\b/gi, "well-being")
+      .replace(/\bcatch\s*-up-with-household\b/gi, "catch-up with household")
+      .replace(/\bCOOP\s+eration\b/g, "cooperation")
+      .replace(/\b6\.1\s*percent\b/gi, "6.1 percent")
+      .replace(/\bS1mply\b/g, "Simply")
+      .replace(/\blmpinge\b/g, "impinge")
+      .replace(/锛宲eople/g, ", people")
+      .replace(/锛宮ost/g, ", most")
+      .replace(/锛寃ho/g, ", who")
+      .replace(/锛歸orking/g, ": working")
+      .replace(/锛宑ould/g, "could")
       .replace(/\boud\b/g, "and")
       .replace(/\bserves earning\b/g, "servers earning")
       .replace(/\basking or help\b/gi, "asking for help")
@@ -1077,6 +1140,7 @@
 
   function cleanOptionText(value) {
     return cleanText(value)
+      .replace(/\s*(?:20\d{2}\s*年\s*)?管理类专业学位联考英语试题[\s\S]*$/g, "")
       .replace(/\s*管理类专业学位联考英语试题\s*[-－—]?\s*\d+\s*[-－—]?.*$/g, "")
       .replace(/\s*MBA\s*大师.*$/gi, "")
       .trim();
@@ -1110,6 +1174,7 @@
   function cleanExamDirections(value) {
     return cleanText(value)
       .replace(/^Section\s+I\s+Use\s+of\s+English\s*/i, "")
+      .replace(/^Directions:\s*Read the following text\.[\s\S]*?\(\s*10\s*\.?\s*points?\s*\)\s*/i, "")
       .replace(/\bword\s+\(s\)/gi, "word(s)")
       .replace(/\bmark\s+A,\s*B,\s*C\s+or\s+D\b/gi, "mark [A], [B], [C] or [D]")
       .replace(/\bmark\s*A,\s*B,\s*C\s*or\s*D\b/gi, "mark [A], [B], [C] or [D]")

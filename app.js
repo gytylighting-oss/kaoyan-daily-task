@@ -502,7 +502,7 @@ function bindNavigation() {
 }
 
 function bindActions() {
-  $("#backButton").addEventListener("click", closeStudy);
+  $("#backButton").addEventListener("click", () => closeStudy(true));
   $("#cloudButton")?.addEventListener("click", uploadCloudSync);
   bindStudySwipeBack();
 }
@@ -511,17 +511,50 @@ function bindStudySwipeBack() {
   const screen = $("#studyScreen");
   let startX = 0;
   let startY = 0;
+  let dragging = false;
+  let lastDx = 0;
   screen.addEventListener("touchstart", (event) => {
+    if (screen.classList.contains("hidden")) return;
     const touch = event.touches[0];
     startX = touch.clientX;
     startY = touch.clientY;
+    dragging = false;
+    lastDx = 0;
   }, { passive: true });
+  screen.addEventListener("touchmove", (event) => {
+    if (screen.classList.contains("hidden")) return;
+    const touch = event.touches[0];
+    const dx = Math.max(0, touch.clientX - startX);
+    const dy = Math.abs(touch.clientY - startY);
+    if (startX > 56 || dy > 80 || dx < 8) return;
+    dragging = true;
+    lastDx = dx;
+    screen.classList.add("swiping");
+    screen.style.transform = `translate3d(${Math.min(dx, window.innerWidth)}px, 0, 0)`;
+    screen.style.opacity = String(Math.max(0.72, 1 - dx / window.innerWidth * 0.26));
+    event.preventDefault();
+  }, { passive: false });
   screen.addEventListener("touchend", (event) => {
     if (screen.classList.contains("hidden")) return;
     const touch = event.changedTouches[0];
-    const dx = touch.clientX - startX;
+    const dx = Math.max(lastDx, touch.clientX - startX);
     const dy = Math.abs(touch.clientY - startY);
-    if (startX < 50 && dx > 80 && dy < 80) closeStudy();
+    screen.classList.remove("swiping");
+    if ((dragging || startX < 56) && dx > 88 && dy < 96) {
+      closeStudy(true);
+      return;
+    }
+    screen.style.transform = "";
+    screen.style.opacity = "";
+    dragging = false;
+    lastDx = 0;
+  }, { passive: true });
+  screen.addEventListener("touchcancel", () => {
+    screen.classList.remove("swiping");
+    screen.style.transform = "";
+    screen.style.opacity = "";
+    dragging = false;
+    lastDx = 0;
   }, { passive: true });
 }
 
@@ -1759,14 +1792,31 @@ function openSession(kind, options = {}) {
   studyScreen.classList.toggle("memory-mode", kind === "vocab" || kind === "phrases");
   studyScreen.classList.toggle("lesson-mode", kind !== "vocab" && kind !== "phrases");
   studyScreen.classList.toggle("exam-mode", kind === "exam");
+  studyScreen.classList.remove("closing", "swiping");
+  studyScreen.style.transform = "";
+  studyScreen.style.opacity = "";
   studyScreen.classList.remove("hidden");
   renderSession();
 }
 
-function closeStudy() {
+function closeStudy(animate = false) {
   const studyScreen = $("#studyScreen");
+  if (animate && !studyScreen.classList.contains("hidden")) {
+    studyScreen.classList.remove("swiping");
+    studyScreen.classList.add("closing");
+    studyScreen.style.transform = "translate3d(100%, 0, 0)";
+    studyScreen.style.opacity = "0.72";
+    window.setTimeout(() => finishCloseStudy(studyScreen), 220);
+    return;
+  }
+  finishCloseStudy(studyScreen);
+}
+
+function finishCloseStudy(studyScreen = $("#studyScreen")) {
   studyScreen.classList.add("hidden");
-  studyScreen.classList.remove("memory-mode", "lesson-mode", "exam-mode");
+  studyScreen.classList.remove("memory-mode", "lesson-mode", "exam-mode", "closing", "swiping");
+  studyScreen.style.transform = "";
+  studyScreen.style.opacity = "";
   session = null;
   renderAll();
 }
@@ -2266,11 +2316,13 @@ function renderWritingSession(plan) {
               <span aria-hidden="true">🔊</span>
               <strong>朗读整句</strong>
             </button>
+            ${canvasPanel(`writing-${index}`, "手写背诵")}
           </section>
         `).join("")}
       </div>
     </article>
   `;
+  practiceLines.forEach((_, index) => setupCanvas(`writing-${index}`, "writing"));
 }
 
 function paragraphName(index) {
@@ -2843,18 +2895,43 @@ function renderQuestionDrawerHeader(questions, sourceLabel = "") {
 }
 
 function renderClozePassage(question, questions) {
-  let html = escapeHtml((question.paragraphs?.length ? question.paragraphs.join("\n\n") : question.passage || ""));
-  [...questions].sort((a, b) => b.questionNo - a.questionNo).forEach((item) => {
-    const pattern = new RegExp(`(?<![A-Za-z0-9])${item.questionNo}(?![A-Za-z0-9%])`, "g");
-    const selected = session.exam.answers[item.id] || "";
-    const submitted = Boolean(session.exam.submitted);
-    const stateClass = submitted
-      ? selected === item.officialAnswer ? "correct" : selected ? "wrong" : "unanswered"
-      : selected ? "selected" : "";
-    const label = submitted ? `${item.questionNo}.${selected || "未作答"}` : `${item.questionNo}.`;
-    html = html.replace(pattern, `<button class="cloze-blank ${stateClass}" type="button" data-jump-question="${escapeAttr(item.id)}">${escapeHtml(label)}</button>`);
+  const source = question.paragraphs?.length ? question.paragraphs.join("\n\n") : question.passage || "";
+  return splitClozePassageParagraphs(source).map((paragraph) => {
+    let html = escapeHtml(paragraph);
+    [...questions].sort((a, b) => b.questionNo - a.questionNo).forEach((item) => {
+      const pattern = new RegExp(`(?<![A-Za-z0-9])${item.questionNo}(?![A-Za-z0-9%])`, "g");
+      const selected = session.exam.answers[item.id] || "";
+      const submitted = Boolean(session.exam.submitted);
+      const stateClass = submitted
+        ? selected === item.officialAnswer ? "correct" : selected ? "wrong" : "unanswered"
+        : selected ? "selected" : "";
+      const label = submitted ? `${item.questionNo}.${selected || "未作答"}` : `${item.questionNo}.`;
+      html = html.replace(pattern, `<button class="cloze-blank ${stateClass}" type="button" data-jump-question="${escapeAttr(item.id)}">${escapeHtml(label)}</button>`);
+    });
+    return `<p class="analysis-paragraph cloze-paragraph">${html}</p>`;
+  }).join("");
+}
+
+function splitClozePassageParagraphs(value) {
+  const text = String(value || "").replace(/\r/g, "").trim();
+  if (!text) return [];
+  const explicit = text.split(/\n{2,}/).map((paragraph) => paragraph.replace(/\s+/g, " ").trim()).filter(Boolean);
+  if (explicit.length > 1) return explicit;
+  const sentences = text.replace(/\s+/g, " ").match(/[^.!?]+[.!?]+["')\]]?/g) || [text.replace(/\s+/g, " ")];
+  const chunks = [];
+  let current = "";
+  sentences.forEach((sentence) => {
+    const cleanSentence = sentence.trim();
+    const next = `${current} ${cleanSentence}`.trim();
+    if (current && next.length > 520) {
+      chunks.push(current);
+      current = cleanSentence;
+    } else {
+      current = next;
+    }
   });
-  return html.split(/\n{2,}/).map((paragraph) => `<p class="analysis-paragraph">${paragraph}</p>`).join("");
+  if (current) chunks.push(current);
+  return chunks.length ? chunks : [text.replace(/\s+/g, " ")];
 }
 
 function renderAnalysisQuestionCompact(question) {
@@ -4479,9 +4556,8 @@ function renderLookupText(text, highlight = "", alreadyHtml = false) {
 function buildWordIndex(words) {
   const index = new Map();
   words.forEach((word) => {
-    lookupCandidates(word.term).forEach((candidate) => {
-      if (candidate?.term && !index.has(candidate.term)) index.set(candidate.term, word);
-    });
+    const term = cleanLookupKey(word.term);
+    if (term && !index.has(term)) index.set(term, word);
   });
   return index;
 }
