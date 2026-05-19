@@ -60,22 +60,80 @@ const catalogPhrases = (content.phrases || [])
   }))
   .filter((phrase) => phrase.phrase);
 
+const curatedLookupMeanings = {
+  percent: ["n.", "百分之……；百分比"],
+  reskill: ["v.", "重新培训；学习新技能以适应新岗位"],
+  reskilling: ["n.", "再培训；职业技能重塑"],
+  reskilled: ["v.", "重新培训过；使掌握新技能"],
+  retraining: ["n.", "再培训；转岗培训"],
+  buzzword: ["n.", "流行术语；时髦词"],
+  requirement: ["n.", "要求；必要条件"],
+  "would-be": ["adj.", "想要成为的；未来的"],
+  demand: ["n./v.", "需求；要求"],
+  rapidly: ["adv.", "迅速地；快速地"],
+  core: ["adj./n.", "核心的；核心"],
+  skills: ["n.", "技能；技巧"],
+  role: ["n.", "角色；职责；作用"],
+  roles: ["n.", "角色；职责；作用"],
+  timeline: ["n.", "时间表；进度线"],
+  thorny: ["adj.", "棘手的；难处理的"],
+  temptation: ["n.", "诱惑；冲动"],
+  replace: ["v.", "替换；取代"],
+  mismatch: ["n.", "不匹配；错配"],
+  broader: ["adj.", "更广泛的"],
+  economy: ["n.", "经济；经济体"],
+  government: ["n.", "政府"],
+  handle: ["v.", "处理；应对"],
+  efforts: ["n.", "努力；尝试"],
+  arguably: ["adv.", "可以说；有理由认为"],
+  languid: ["adj.", "缓慢无力的；缺乏活力的"],
+  employees: ["n.", "雇员；员工"],
+  unemployment: ["n.", "失业；失业率"],
+  shortage: ["n.", "短缺；不足"],
+  shortages: ["n.", "短缺；不足"],
+  medical: ["adj.", "医学的；医疗的"],
+  personnel: ["n.", "人员；员工"],
+  unemployed: ["adj.", "失业的"],
+  gap: ["n.", "差距；缺口"],
+  benefit: ["n./v.", "好处；受益；有益于"],
+  concerned: ["adj.", "有关的；担心的"],
+  forced: ["adj./v.", "被迫的；迫使"],
+  furlough: ["v./n.", "让员工暂时休假；停薪留职"],
+  cabin: ["n.", "客舱；小屋"],
+  staff: ["n.", "员工；全体职员"],
+  airlines: ["n.", "航空公司"],
+  collective: ["adj.", "集体的；共同的"],
+  university: ["n.", "大学"],
+  pledged: ["v.", "承诺；保证"],
+  massive: ["adj.", "大规模的；巨大的"],
+  strategy: ["n.", "策略；战略"],
+  "fire-and-hire": ["adj.", "解雇再雇用式的"]
+};
+
+function getCuratedLookupMeaning(term) {
+  const entry = curatedLookupMeanings[cleanLookupKey(term)];
+  return entry ? { pos: entry[0], meaning: entry[1] } : null;
+}
+
 const lookupOnlyWords = (lookupContent.words || [])
-  .map((word, index) => ({
-    id: word.id || `lookup-${index}`,
-    group: "查词词库",
-    unit: 0,
-    term: clean(word.term),
-    ipa: clean(word.ipa),
-    pos: clean(word.pos || "lookup"),
-    meaning: clean(word.meaning || "查词词库补充词；释义待完善"),
-    exam: "",
-    sentence: "",
-    translation: "",
-    memory: "",
-    source: clean(word.source || "lookup-only"),
-    lookupOnly: true
-  }))
+  .map((word, index) => {
+    const curated = getCuratedLookupMeaning(word.term);
+    return {
+      id: word.id || `lookup-${index}`,
+      group: "查词词库",
+      unit: 0,
+      term: clean(word.term),
+      ipa: clean(word.ipa),
+      pos: clean(curated?.pos || word.pos || "lookup"),
+      meaning: clean(curated?.meaning || word.meaning || "查词词库补充词；释义待完善"),
+      exam: "",
+      sentence: "",
+      translation: "",
+      memory: "",
+      source: clean(curated ? "curated lookup" : word.source || "lookup-only"),
+      lookupOnly: true
+    };
+  })
   .filter((word) => word.term);
 
 const wordIndex = buildWordIndex([...catalogWords, ...lookupOnlyWords]);
@@ -502,7 +560,7 @@ function bindNavigation() {
 }
 
 function bindActions() {
-  $("#backButton").addEventListener("click", () => closeStudy(true));
+  $("#backButton").addEventListener("click", () => closeStudy(false));
   $("#cloudButton")?.addEventListener("click", uploadCloudSync);
   bindStudySwipeBack();
 }
@@ -513,6 +571,14 @@ function bindStudySwipeBack() {
   let startY = 0;
   let dragging = false;
   let lastDx = 0;
+  let swipeFrame = 0;
+  let pendingDx = 0;
+  const paintSwipe = () => {
+    swipeFrame = 0;
+    const dx = Math.min(pendingDx, window.innerWidth);
+    screen.style.transform = `translate3d(${dx}px, 0, 0)`;
+    screen.style.opacity = String(Math.max(0.82, 1 - dx / window.innerWidth * 0.18));
+  };
   screen.addEventListener("touchstart", (event) => {
     if (screen.classList.contains("hidden")) return;
     const touch = event.touches[0];
@@ -520,6 +586,7 @@ function bindStudySwipeBack() {
     startY = touch.clientY;
     dragging = false;
     lastDx = 0;
+    pendingDx = 0;
   }, { passive: true });
   screen.addEventListener("touchmove", (event) => {
     if (screen.classList.contains("hidden")) return;
@@ -530,18 +597,22 @@ function bindStudySwipeBack() {
     dragging = true;
     lastDx = dx;
     screen.classList.add("swiping");
-    screen.style.transform = `translate3d(${Math.min(dx, window.innerWidth)}px, 0, 0)`;
-    screen.style.opacity = String(Math.max(0.72, 1 - dx / window.innerWidth * 0.26));
+    pendingDx = dx;
+    if (!swipeFrame) swipeFrame = window.requestAnimationFrame(paintSwipe);
     event.preventDefault();
   }, { passive: false });
   screen.addEventListener("touchend", (event) => {
     if (screen.classList.contains("hidden")) return;
+    if (swipeFrame) {
+      window.cancelAnimationFrame(swipeFrame);
+      swipeFrame = 0;
+    }
     const touch = event.changedTouches[0];
     const dx = Math.max(lastDx, touch.clientX - startX);
     const dy = Math.abs(touch.clientY - startY);
     screen.classList.remove("swiping");
     if ((dragging || startX < 56) && dx > 88 && dy < 96) {
-      closeStudy(true);
+      closeStudy(false);
       return;
     }
     screen.style.transform = "";
@@ -550,6 +621,10 @@ function bindStudySwipeBack() {
     lastDx = 0;
   }, { passive: true });
   screen.addEventListener("touchcancel", () => {
+    if (swipeFrame) {
+      window.cancelAnimationFrame(swipeFrame);
+      swipeFrame = 0;
+    }
     screen.classList.remove("swiping");
     screen.style.transform = "";
     screen.style.opacity = "";
@@ -2897,7 +2972,7 @@ function renderQuestionDrawerHeader(questions, sourceLabel = "") {
 function renderClozePassage(question, questions) {
   const source = question.paragraphs?.length ? question.paragraphs.join("\n\n") : question.passage || "";
   return splitClozePassageParagraphs(source).map((paragraph) => {
-    let html = escapeHtml(paragraph);
+    let html = escapeHtml(cleanExamDisplayText(paragraph));
     [...questions].sort((a, b) => b.questionNo - a.questionNo).forEach((item) => {
       const pattern = new RegExp(`(?<![A-Za-z0-9])${item.questionNo}(?![A-Za-z0-9%])`, "g");
       const selected = session.exam.answers[item.id] || "";
@@ -2913,7 +2988,7 @@ function renderClozePassage(question, questions) {
 }
 
 function splitClozePassageParagraphs(value) {
-  const text = String(value || "").replace(/\r/g, "").trim();
+  const text = cleanExamDisplayText(String(value || "").replace(/\r/g, "")).trim();
   if (!text) return [];
   const explicit = text.split(/\n{2,}/).map((paragraph) => paragraph.replace(/\s+/g, " ").trim()).filter(Boolean);
   if (explicit.length > 1) return explicit;
@@ -3067,7 +3142,7 @@ function renderAnnotatedQuestionStem(question) {
 }
 
 function renderHighlightedPassage(question) {
-  const paragraphs = question.paragraphs?.length ? question.paragraphs : [question.passage].filter(Boolean);
+  const paragraphs = question.paragraphs?.length ? question.paragraphs : splitExamParagraphs(question.passage);
   const evidence = session.exam.submitted ? getEvidenceSentences(question).map((item) => ({ ...item, anchorId: getEvidenceAnchorId(question, item.paragraphIndex || 1, item.index) })) : [];
   const vocab = session.exam.submitted ? getQuestionVocabularyTerms(question) : [];
   return paragraphs.map((paragraph, index) => {
@@ -3079,7 +3154,7 @@ function renderHighlightedPassage(question) {
 
 function renderHighlightedPassageForQuestions(questions) {
   const first = questions[0] || {};
-  const paragraphs = first.paragraphs?.length ? first.paragraphs : [first.passage].filter(Boolean);
+  const paragraphs = first.paragraphs?.length ? first.paragraphs : splitExamParagraphs(first.passage);
   const evidence = session.exam.submitted
     ? questions.flatMap((question) => getEvidenceSentences(question).map((item) => ({ ...item, anchorId: getEvidenceAnchorId(question, item.paragraphIndex || 1, item.index) })))
     : [];
@@ -3660,7 +3735,7 @@ function renderExamSession(plan) {
         ${questionSet?.passage ? `
           <details class="exam-passage" open>
             <summary>原文</summary>
-            <p>${renderLookupText(questionSet.passage)}</p>
+            <div class="analysis-passage-body legacy-exam-passage">${renderExamDisplayParagraphs(questionSet.passage)}</div>
           </details>
         ` : ""}
         <div class="exam-step-strip">
@@ -3722,7 +3797,7 @@ function renderExamQuestion(question, index) {
       <div class="option-grid">
         ${question.options.map((option) => `
           <button class="${selected === option.key ? "selected" : ""} ${submitted && option.key === question.answer ? "correct" : ""}" type="button" data-answer-question="${escapeAttr(question.id)}" data-answer="${option.key}">
-            <strong>${option.key}</strong><span>${renderLookupText(option.text)}</span>
+            <i aria-hidden="true"></i><strong>${option.key}</strong><span>${renderLookupText(option.text)}</span>
           </button>
         `).join("")}
       </div>
@@ -4540,8 +4615,21 @@ function makeEvent(id, summary, description, start, minutes, rrule) {
 }
 
 function renderLookupText(text, highlight = "", alreadyHtml = false) {
-  const source = alreadyHtml ? text : escapeHtml(text || "");
-  return source.replace(/([A-Za-z][A-Za-z'-]*)/g, (match) => {
+  const source = alreadyHtml ? String(text || "") : cleanExamDisplayText(text || "");
+  if (alreadyHtml) return source.replace(/([A-Za-z][A-Za-z'-]*)/g, (match) => renderLookupToken(match, highlight));
+  const parts = [];
+  const pattern = /([A-Za-z][A-Za-z'-]*)/g;
+  let lastIndex = 0;
+  for (const match of source.matchAll(pattern)) {
+    parts.push(escapeHtml(source.slice(lastIndex, match.index)));
+    parts.push(renderLookupToken(match[0], highlight));
+    lastIndex = match.index + match[0].length;
+  }
+  parts.push(escapeHtml(source.slice(lastIndex)));
+  return parts.join("");
+}
+
+function renderLookupToken(match, highlight = "") {
     const lower = match.toLowerCase();
     const lookupMatch = findLookupMatch(lower);
     const lookup = lookupMatch ? lookupMatch.word.term.toLowerCase() : lower;
@@ -4549,8 +4637,7 @@ function renderLookupText(text, highlight = "", alreadyHtml = false) {
     const suffixAttrs = lookupMatch?.suffix
       ? ` data-root="${escapeAttr(lookupMatch.word.term)}" data-suffix="${escapeAttr(lookupMatch.suffix)}"`
       : "";
-    return `<span class="${className}" data-lookup="${escapeAttr(lookup)}" data-speak="${escapeAttr(match)}"${suffixAttrs}>${match}</span>`;
-  });
+    return `<span class="${className}" data-lookup="${escapeAttr(lookup)}" data-speak="${escapeAttr(match)}"${suffixAttrs}>${escapeHtml(match)}</span>`;
 }
 
 function buildWordIndex(words) {
@@ -4896,6 +4983,90 @@ function unique(items) {
 
 function clean(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function cleanExamDisplayText(value) {
+  let text = String(value || "");
+  if (!text) return "";
+  text = text
+    .replace(/&quot;|&#34;/gi, "\"")
+    .replace(/&apos;|&#39;/gi, "'")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\bResk[1lI]{3}ing\b/g, "Reskilling")
+    .replace(/\bresk[1lI]{3}ing\b/g, "reskilling")
+    .replace(/\bResk[1lI]{3}ed\b/g, "Reskilled")
+    .replace(/\bresk[1lI]{3}ed\b/g, "reskilled")
+    .replace(/\u00a0/g, " ")
+    .replace(/\r/g, "")
+    .replace(/[ \t\f\v]+/g, " ")
+    .replace(/\s+([,.;:!?%])/g, "$1")
+    .replace(/([([{])\s+/g, "$1")
+    .replace(/\s+([)\]}])/g, "$1")
+    .replace(/\b([A-Za-z])\s+'\s+([a-z]{1,2})\b/gi, "$1'$2")
+    .replace(/\b(can|don|doesn|aren|isn|wasn|weren|wouldn|couldn|shouldn)\s*,\s*t\b/gi, "$1't")
+    .replace(/\bIt\s*,\s*s\b/g, "It's")
+    .replace(/\b1\s*S\b/g, "is")
+    .replace(/\bt[O0]\b/g, "to")
+    .replace(/\bt[O0]day\b/gi, "today")
+    .replace(/\bt[O0]\s+/g, "to ")
+    .replace(/\b[O0]f\b/g, "of")
+    .replace(/\b[O0]n\b/g, "on")
+    .replace(/\b[O0]r\b/g, "or")
+    .replace(/\b[O0]ne\b/g, "one")
+    .replace(/\b[O0]ther\b/g, "other")
+    .replace(/\bh[O0]w\b/gi, "how")
+    .replace(/\bln\b/g, "in")
+    .replace(/\blt\b/g, "It")
+    .replace(/\bU(?:1|l|I){2,}versity\b/gi, "University")
+    .replace(/\bUn[1lI]versity\b/gi, "University")
+    .replace(/\buniverslty\b/gi, "university")
+    .replace(/\bscientlsts\b/gi, "scientists")
+    .replace(/\bscientiflc\b/gi, "scientific")
+    .replace(/\bquestlonnmres\b/gi, "questionnaires")
+    .replace(/\bdestmctive\b/gi, "destructive")
+    .replace(/\bhairclt\b/gi, "haircut")
+    .replace(/\btlpping\b/gi, "tipping")
+    .replace(/\bse1T1Ces\b/gi, "services")
+    .replace(/\bhistoncally\b/gi, "historically")
+    .replace(/\bwearmg\b/gi, "wearing")
+    .replace(/\bwarmmgs\b/gi, "warnings")
+    .replace(/\s+--\s+/g, " -- ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text;
+}
+
+function splitExamParagraphs(value) {
+  const raw = String(value || "").replace(/\r/g, "").trim();
+  if (!raw) return [];
+  const explicit = raw
+    .split(/\n{2,}/)
+    .map((paragraph) => cleanExamDisplayText(paragraph))
+    .filter(Boolean);
+  if (explicit.length > 1) return explicit;
+  const text = cleanExamDisplayText(raw);
+  const sentences = text.match(/[^.!?]+[.!?]+["')\]]?/g) || [text];
+  const chunks = [];
+  let current = "";
+  sentences.forEach((sentence) => {
+    const cleanSentence = sentence.trim();
+    const next = `${current} ${cleanSentence}`.trim();
+    if (current && next.length > 620) {
+      chunks.push(current);
+      current = cleanSentence;
+    } else {
+      current = next;
+    }
+  });
+  if (current) chunks.push(current);
+  return chunks.length ? chunks : [text];
+}
+
+function renderExamDisplayParagraphs(value) {
+  return splitExamParagraphs(value)
+    .map((paragraph) => `<p class="analysis-paragraph">${renderLookupText(paragraph)}</p>`)
+    .join("");
 }
 
 function todayKey() {

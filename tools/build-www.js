@@ -13,6 +13,7 @@ const files = [
   "generated-reading-overrides.js",
   "generated-grammar.js",
   "generated-writing.js",
+  "generated-analysis-bundle.js",
   "exam-analysis-data.js",
   "generated-exam.js",
   "manifest.webmanifest",
